@@ -40,6 +40,7 @@ def test_sqlite():
     cur.close()
     conn.close()
 
+# 读取评分数据
 def get_ratings_csv():
     with open(osjoin(dataset_dir, "ratings.csv"), "rb") as file_csv:
         spamreader = csv.reader(file_csv)
@@ -55,6 +56,7 @@ def get_ratings_csv():
 
     return result
 
+#读取电影名字数据
 def get_title_csv():
     with open(osjoin(dataset_dir, "movies.csv"), "rb") as file_csv:
         spamreader = csv.reader(file_csv)
@@ -67,11 +69,19 @@ def get_title_csv():
 
     return result
 
+# 计算电影相似度
+def calculate_similar_items():
+    ratings = get_ratings_csv()
+    result = recommendation.calculate_similar_items(ratings)
+    functions.output_to_json(result, osjoin(dataset_dir, "similar.json"))
+
+# 计算某个用户的推荐
 def get_recommendations(userId, n = 100):
     ratings = get_ratings_csv()
     recommendations = recommendation.get_recommendations(ratings, userId)
     print recommendations[0:n]
 
+# 输出某个用户的推荐电影名字
 def print_recommendations_with_title(userId, n = 100):
     ratings = get_ratings_csv()
     titles = get_title_csv()
@@ -80,11 +90,12 @@ def print_recommendations_with_title(userId, n = 100):
         r = recommendations[k]
         print r[0], titles[r[1]]
 
+# 计算某个用户的推荐(使用电影相似度)
 def get_recommendations_by_item(userId):
     result = get_ratings()
     matches = recommendation.get_recommendations(result, userId)
     print matches[0:100]
 
 if __name__ == '__main__':
-    print_recommendations_with_title(1, 1000)
+    calculate_similar_items()
 

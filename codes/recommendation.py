@@ -84,13 +84,22 @@ def test_sim_pearson():
     print sim_pearson(prefs, "p1", "p2")
 
 # 计算相似度最大的前几名
-def top_matches(prefs, k, num = 5, sim = sim_distance):
+# n: 取相似度前多少名，默认取所有的
+def top_matches(prefs, k, n = None, sim = sim_distance):
     start_time = time.time()
-    scores = [(sim(prefs, k, other), other) for other in prefs if other != k]
+    scores = []
+    for other in prefs:
+        if other != k:
+            similarity = sim(prefs, k, other)
+            if similarity > 0:
+                scores.append((similarity, other))
     scores.sort()
     scores.reverse()
-    print "top_matches cost time %d" % (time.time() - start_time)
-    return scores[0:num]
+    # print "top_matches cost time %d" % (time.time() - start_time)
+    if n == None:
+        return scores
+    else:
+        return scores[0:n]
 
 def test_top_matches():
     prefs = {}
@@ -144,7 +153,8 @@ def transform_prefs(prefs):
     return result
 
 # 计算相近的物品
-def calculate_similar_items(prefs, n = 10):
+# n: 取相似度前多少名，默认取所有的
+def calculate_similar_items(prefs, n = None):
     start_time = time.time()
     result = {}
     prefs_item = transform_prefs(prefs)

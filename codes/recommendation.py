@@ -88,6 +88,11 @@ def test_sim_pearson():
     prefs["p3"] = {"m0": 2}
     print sim_pearson(prefs, "p1", "p2")
 
+# 谷本系数的相似性度量
+# 两个集合的交集 / 并集
+def sim_tanimoto(prefs, k1, k2):
+    # 实现略
+
 # 计算相似度最大的前几名
 # n: 取相似度前多少名，默认取所有的
 def top_matches(prefs, k, n = None, sim = sim_distance):

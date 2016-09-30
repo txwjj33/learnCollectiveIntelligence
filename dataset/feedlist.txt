@@ -1,0 +1,3 @@
+http://www.techdirt.com/techdirt_rss.xml
+http://www.tmz.com/rss.xml
+http://www.tuaw.com/rss.xml

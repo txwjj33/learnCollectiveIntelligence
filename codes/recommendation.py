@@ -7,6 +7,11 @@
 
 import math
 import time
+import sqlite3
+import os, os.path
+import json
+
+import functions
 
 # 利用距离计算相似度
 # 一次遍历，性能稍微好点
@@ -20,13 +25,13 @@ def sim_distance(prefs, k1, k2):
     if n == 0:
         return 0
     else:
-        return 1 / (1 + math.sqrt(distance))
+        return round(1 / (1 + math.sqrt(distance)), 2)
 
 def sim_distance_2(prefs, k1, k2):
     same_items = [item for item in prefs[k1] if item in prefs[k2]]
     if len(same_items) == 0: return 0
     distance = sum(pow(prefs[k1][item] - prefs[k2][item], 2) for item in same_items)
-    return 1 / (1 + math.sqrt(distance))
+    return round(1 / (1 + math.sqrt(distance)), 2)
 
 def test_sim_distance():
     prefs = {}
@@ -58,7 +63,7 @@ def sim_pearson(prefs, k1, k2):
         result = num / den
         if result > 1: return 1
         if result < -1: return -1
-        return result
+        return round(result, 2)
 
 def sim_pearson_2(prefs, k1, k2):
     same_items = [item for item in prefs[k1] if item in prefs[k2]]
@@ -74,7 +79,7 @@ def sim_pearson_2(prefs, k1, k2):
     num = sum_product - sum1 * sum2 / n
     den = math.sqrt((sum1_square - sum1 * sum1 / n) * (sum2_square - sum2 * sum2 / n))
     if den == 0: return 1  # ?
-    return num / den
+    return round(num / den, 2)
 
 def test_sim_pearson():
     prefs = {}
@@ -99,7 +104,7 @@ def top_matches(prefs, k, n = None, sim = sim_distance):
     if n == None:
         return scores
     else:
-        return scores[0:n]
+        return scores[0 : n]
 
 def test_top_matches():
     prefs = {}
@@ -163,11 +168,46 @@ def calculate_similar_items(prefs, n = None):
         count += 1
         if count % 100 == 0:
             print "%d / %d" %(count, len(prefs_item))
-        scores = top_matches(prefs_item, item, n)
-        result[item] = scores
+        result[item] = top_matches(prefs_item, item, n)
 
     print "calculate_similar_items cost time %d" % (time.time() - start_time)
     return result
+
+# 计算相近的物品
+# file_name: 存储结果，使用sqlite
+# n: 取相似度前多少名，默认取所有的
+def calculate_similar_items_save(prefs, file_name, n = None):
+    start_time = time.time()
+    if os.path.exists(file_name):
+        os.remove(file_name)
+    conn = sqlite3.connect(file_name)
+    cur = conn.cursor()
+    cur.execute("create table similarity (item, list)")
+
+    prefs_item = transform_prefs(prefs)
+    count = 0
+    for item in prefs_item:
+        count += 1
+        if count % 100 == 0:
+            print "%d / %d" %(count, len(prefs_item))
+        matches = top_matches(prefs_item, item, n)
+        # sqlite不支持多级key, 所以把matches变成json存储
+        cur.execute('insert into similarity values (?, ?)', (item, json.dumps(matches)))
+
+    print "calculate_similar_items_save cost time %d" % (time.time() - start_time)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+# 查询某个item的相关item的相似度列表
+def get_similar_by_item(file_name, item):
+    conn = sqlite3.connect(file_name)
+    cur = conn.cursor()
+    cur.execute("select * from similarity where item = ?", (item,))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+    return json.loads(result[1])
 
 def test_calculate_similar_items():
     prefs = {}
@@ -178,14 +218,14 @@ def test_calculate_similar_items():
     print calculate_similar_items(prefs)
 
 # 使用计算好的相近物品列表来推荐
-# item_match: 计算好的物品相似度列表
-def get_recommendations_items(prefs, k, item_match):
+# get_sim: 获取某个item的相似度列表的函数，含item参数
+def get_recommendations_items_base(prefs, k, get_sim):
     start_time = time.time()
     user_rankings = prefs[k]
     scores = {}
     total_sim = {}
     for (item, rating) in user_rankings.items():
-        for (similarity, item2) in item_match[item]:
+        for (similarity, item2) in get_sim(item):
             if item2 in user_rankings: continue
             if similarity <= 0: continue
             scores.setdefault(item2, 0)
@@ -193,12 +233,30 @@ def get_recommendations_items(prefs, k, item_match):
             total_sim.setdefault(item2, 0)
             total_sim[item2] += similarity
 
-    rankings = [(total / total_sim[item], item) for (item, total) in scores.items()]
+    rankings = []
+    for (item, total) in scores.items():
+        rank = total / total_sim[item]
+        rankings.append((round(rank, 2), item))
     rankings.sort()
     rankings.reverse()
 
-    print "get_recommendations_items cost time %d" % (time.time() - start_time)
+    print "get_recommendations_items_base cost time %d" % (time.time() - start_time)
     return rankings
+
+# 使用计算好的相近物品列表来推荐
+# item_match: 计算好的物品相似度列表
+def get_recommendations_items(prefs, k, item_match):
+    def get_sim(item):
+        return item_match[item]
+    return get_recommendations_items_base(prefs, k, get_sim)
+
+# 使用计算好的相近物品列表来推荐
+# file_name: 计算好的物品相似度列表数据库文件
+# 对每个item调用get_similar_by_item时间太长
+def get_recommendations_items_with_file(prefs, k, file_name):
+    def get_sim(item):
+        return get_similar_by_item(file_name, item)
+    return get_recommendations_items_base(prefs, k, get_sim)
 
 def test_get_recommendations_items():
     prefs = {}

@@ -21,25 +21,7 @@ osjoin = os.path.join
 
 dataset_dir = osjoin("..", "dataset", "ml-latest-small")
 
-def test_sqlite():
-    import sqlite3
-
-    conn = sqlite3.connect(osjoin(dataset_dir, "test.db"))
-    cur = conn.cursor()
-    # 创建表
-    create_table = "create table books (title, author, lang)"
-    cur.execute(create_table)
-
-    # 插入数据
-    cur.execute('insert into books values ("test_title", "txw", "python")')
-    # 读取
-    cur.execute('select * from books')
-    print(cur.fetchall())
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
+###############  解析数据相关函数
 # 读取评分数据
 def get_ratings_csv():
     with open(osjoin(dataset_dir, "ratings.csv"), "rb") as file_csv:
@@ -49,10 +31,10 @@ def get_ratings_csv():
         for row in spamreader:
             k += 1
             if k == 1: continue
-            userId = int(row[0])
-            result.setdefault(userId, {})
-            movieId = int(row[1])
-            result[userId][movieId] = float(row[2])
+            user_id = int(row[0])
+            result.setdefault(user_id, {})
+            movie_id = int(row[1])
+            result[user_id][movie_id] = float(row[2])
 
     return result
 
@@ -72,30 +54,49 @@ def get_title_csv():
 # 计算电影相似度
 def calculate_similar_items():
     ratings = get_ratings_csv()
-    result = recommendation.calculate_similar_items(ratings)
-    functions.output_to_json(result, osjoin(dataset_dir, "similar.json"))
+    file_name = osjoin(dataset_dir, "similar.db")
+    recommendation.calculate_similar_items_save(ratings, file_name)
 
-# 计算某个用户的推荐
-def get_recommendations(userId, n = 100):
+
+###############  电影相似度相关函数
+# 查询某个电影的相似度列表
+def get_similar(movie_id):
+    file_name = osjoin(dataset_dir, "similar.db")
+    return recommendation.get_similar_by_item(file_name, movie_id)
+
+# 输出某个电影的相关电影的相似度和名字
+def print_similar_with_title(movie_id):
+    titles = get_title_csv()
+    print "similar list of movie: " + titles[movie_id]
+    file_name = osjoin(dataset_dir, "similar.db")
+    result = recommendation.get_similar_by_item(file_name, movie_id)
+    for (sim, movie) in result:
+        print sim, movie, titles[movie]
+
+# 计算某个用户的推荐(使用电影相似度)
+# 由于sqlite查询时间过长，这个算法速度还比不上使用用户相似度算
+def get_recommendations_by_item(user_id, n = 100):
     ratings = get_ratings_csv()
-    recommendations = recommendation.get_recommendations(ratings, userId)
-    print recommendations[0:n]
+    file_name = osjoin(dataset_dir, "similar.db")
+    recommendations = recommendation.get_recommendations_items_with_file(ratings, user_id, file_name)
+    print recommendations[0 : n]
+
+
+###############  用户相似度相关函数
+# 计算某个用户的推荐
+def get_recommendations(user_id, n = 100):
+    ratings = get_ratings_csv()
+    recommendations = recommendation.get_recommendations(ratings, user_id)
+    print recommendations[0 : n]
 
 # 输出某个用户的推荐电影名字
-def print_recommendations_with_title(userId, n = 100):
+def print_recommendations_with_title(user_id, n = 100):
     ratings = get_ratings_csv()
     titles = get_title_csv()
-    recommendations = recommendation.get_recommendations(ratings, userId)
+    recommendations = recommendation.get_recommendations(ratings, user_id)
     for k in xrange(1, min(n, len(recommendations))):
         r = recommendations[k]
         print r[0], titles[r[1]]
 
-# 计算某个用户的推荐(使用电影相似度)
-def get_recommendations_by_item(userId):
-    result = get_ratings()
-    matches = recommendation.get_recommendations(result, userId)
-    print matches[0:100]
-
 if __name__ == '__main__':
-    calculate_similar_items()
-
+    get_recommendations_by_item(1)

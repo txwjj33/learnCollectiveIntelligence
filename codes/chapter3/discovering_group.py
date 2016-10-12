@@ -38,8 +38,7 @@ def generate_feedvector():
     # 统计每个词出现的次数
     feed_count = {}
     word_counts = {}
-    file_name = os.path.join("..", "..", "dataset", "feedlist.txt")
-    feed_list = [line for line in file(file_name)]
+    feed_list = [line for line in file("feedlist.txt")]
     for url in feed_list:
         title, wc = get_word_counts(url)
         word_counts[title] = wc

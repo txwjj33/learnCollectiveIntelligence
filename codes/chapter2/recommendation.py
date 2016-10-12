@@ -11,8 +11,6 @@ import sqlite3
 import os, os.path
 import json
 
-import functions
-
 # 利用距离计算相似度
 # 一次遍历，性能稍微好点
 def sim_distance(prefs, k1, k2):
@@ -90,7 +88,7 @@ def test_sim_pearson():
 
 # 谷本系数的相似性度量
 # 两个集合的交集 / 并集
-def sim_tanimoto(prefs, k1, k2):
+# def sim_tanimoto(prefs, k1, k2):
     # 实现略
 
 # 计算相似度最大的前几名

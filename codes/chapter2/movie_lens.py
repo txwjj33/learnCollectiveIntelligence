@@ -14,17 +14,14 @@ import csv
 import os, os.path
 import time
 
-import functions
 import recommendation
 
 osjoin = os.path.join
 
-dataset_dir = osjoin("..", "dataset", "ml-latest-small")
-
 ###############  解析数据相关函数
 # 读取评分数据
 def get_ratings_csv():
-    with open(osjoin(dataset_dir, "ratings.csv"), "rb") as file_csv:
+    with open(osjoin("ml-latest-small", "ratings.csv"), "rb") as file_csv:
         spamreader = csv.reader(file_csv)
         result = {}
         k = 0
@@ -40,7 +37,7 @@ def get_ratings_csv():
 
 #读取电影名字数据
 def get_title_csv():
-    with open(osjoin(dataset_dir, "movies.csv"), "rb") as file_csv:
+    with open(osjoin("ml-latest-small", "movies.csv"), "rb") as file_csv:
         spamreader = csv.reader(file_csv)
         result = {}
         k = 0
@@ -54,21 +51,21 @@ def get_title_csv():
 # 计算电影相似度
 def calculate_similar_items():
     ratings = get_ratings_csv()
-    file_name = osjoin(dataset_dir, "similar.db")
+    file_name = osjoin("ml-latest-small", "similar.db")
     recommendation.calculate_similar_items_save(ratings, file_name)
 
 
 ###############  电影相似度相关函数
 # 查询某个电影的相似度列表
 def get_similar(movie_id):
-    file_name = osjoin(dataset_dir, "similar.db")
+    file_name = osjoin("ml-latest-small", "similar.db")
     return recommendation.get_similar_by_item(file_name, movie_id)
 
 # 输出某个电影的相关电影的相似度和名字
 def print_similar_with_title(movie_id):
     titles = get_title_csv()
     print "similar list of movie: " + titles[movie_id]
-    file_name = osjoin(dataset_dir, "similar.db")
+    file_name = osjoin("ml-latest-small", "similar.db")
     result = recommendation.get_similar_by_item(file_name, movie_id)
     for (sim, movie) in result:
         print sim, movie, titles[movie]
@@ -77,7 +74,7 @@ def print_similar_with_title(movie_id):
 # 由于sqlite查询时间过长，这个算法速度还比不上使用用户相似度算
 def get_recommendations_by_item(user_id, n = 100):
     ratings = get_ratings_csv()
-    file_name = osjoin(dataset_dir, "similar.db")
+    file_name = osjoin("ml-latest-small", "similar.db")
     recommendations = recommendation.get_recommendations_items_with_file(ratings, user_id, file_name)
     print recommendations[0 : n]
 

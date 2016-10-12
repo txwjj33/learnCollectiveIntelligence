@@ -1,0 +1,3 @@
+[submodule "examples/arthur-e_programming_collective_intelligence"]
+	path = examples/arthur-e_programming_collective_intelligence
+	url = https://github.com/arthur-e/Programming-Collective-Intelligence.git

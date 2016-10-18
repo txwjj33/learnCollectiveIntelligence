@@ -41,7 +41,6 @@ def pearson(v1, v2):
 
     return 1.0 - num / den
 
-
 # 利用距离计算相似度
 # 一次遍历，性能稍微好点
 def sim_distance(v1, v2):
@@ -152,8 +151,7 @@ def draw_node(draw, clust, x, y, scaling, labels):
         draw.text((x + 5, y - 7), labels[clust.id], (0, 0, 0))
 
 # 画树状图
-def draw_dendrogram(data, labels):
-    clust = hcluster(data)
+def draw_dendrogram(clust, labels, jpeg = "clusters.jpg"):
     h = get_height(clust) * 20
     w = 1200
     depth = get_depth(clust)
@@ -166,12 +164,13 @@ def draw_dendrogram(data, labels):
     draw = ImageDraw.Draw(img)
     draw.line((0, h / 2, 10, h / 2), fill = (255, 0, 0))
     draw_node(draw, clust, 10, h / 2, scaling, labels)
-    img.save("clusters.jpg", "JPEG")
+    img.save(jpeg, "JPEG")
 
 # 根据blog名字聚类
 def draw_dendrogram_by_blogs():
     rownames, colnames, data = readfile("blogdata.txt")
-    draw_dendrogram(data, rownames)
+    clust = hcluster(data)
+    draw_dendrogram(clust, rownames)
 
 # 转置矩阵
 def rotate_matrix(data):
@@ -187,4 +186,126 @@ def draw_dendrogram_by_words():
     rownames, colnames, data = readfile("blogdata.txt")
     draw_dendrogram(rotate_matrix(data), colnames)
 
-draw_dendrogram_by_words()
+# k-均值聚类算法
+import random
+def kcluster(rows, distance = pearson, k = 4):
+    n = len(rows[0])
+    ranges = [(min(row[i] for row in rows), max(row[i] for row in rows))
+        for i in range(n)]
+
+    # 随机选取k个中心点
+    clusters = [[random.random() * (ranges[i][1] - ranges[i][0]) + ranges[i][0]
+        for i in range(n)] for j in range(k)]
+
+    last_matches = None
+    for t in range(100):
+        print "iteration %d" % t
+        best_matches = [[] for i in range(k)]
+        for j in range(len(rows)):
+            row = rows[j]
+            best_match = 0
+            min_distance = distance(row, clusters[0])
+            for i in range(1, k):
+                d = distance(row, clusters[i])
+                if d < min_distance:
+                    min_distance = d
+                    best_match = i
+            best_matches[best_match].append(j)
+
+        if best_matches == last_matches: break
+        last_matches = best_matches
+        for i in range(k):
+            if len(best_matches[i]) == 0: continue
+            argvs = [0.0] * n
+            for row_id in best_matches[i]:
+                for j in range(n):
+                    argvs[j] += rows[row_id][j]
+            for j in range(n):
+                argvs[j] /= len(best_matches[i])
+            clusters[i] = argvs
+
+    return best_matches
+
+def test_kcluster():
+    rownames, colnames, data = readfile("blogdata.txt")
+    clusters = kcluster(data, k = 4)
+    print clusters
+    print([rownames[i] for i in clusters[0]])
+
+# tanamoto距离算法
+def tanamoto(v1, v2):
+    c1, c2, shr = 0, 0, 0
+    for i in range(len(v1)):
+        if v1[i] != 0: c1 += 1
+        if v2[i] != 0: c2 += 1
+        if v1[i] != 0 and v2[i] != 0: shr += 1
+
+    return 1.0 - float(shr) / (c1 + c2 - shr)
+
+# 对人们想要的物品聚类
+def draw_dendrogram_by_people():
+    rownames, colnames, data = readfile("zebo.txt")
+    clust = hcluster(data, distance = tanamoto)
+    draw_dendrogram(clust, rownames, jpeg = "zebo.jpg")
+
+# 多维缩放算法
+def scale_down(data, distance = pearson, rate = 0.01):
+    n = len(data)
+    real_distance = [[distance(data[i], data[j]) for j in range(n)]
+        for i in range(n)]
+    outer_sum = 0.0
+
+    # 随机摆放节点
+    loc = [[random.random(), random.random()] for i in range(n)]
+    fake_dist = [[0.0 for j in range(n)] for i in range(n)]
+
+    last_error = None
+    for times in range(0, 1000):
+        # 计算节点间的距离
+        for i in range(n):
+            for j in range(n):
+                fake_dist[i][j] = math.sqrt(pow(loc[i][0] - loc[j][0], 2)
+                        + pow(loc[i][1] - loc[j][1], 2))
+
+        # 节点移动距离
+        grad = [[0.0, 0.0] for i in range(n)]
+        total_error = 0
+        for k in range(n):
+            for j in range(n):
+                if j == k: continue
+                # 误差值等于目标距离与当前距离差值的百分比
+                error_term = (fake_dist[j][k] - real_distance[j][k]) / real_distance[j][k]
+                # 计算每个节点的移动距离
+                grad[k][0] += (loc[k][0] - loc[j][0]) / fake_dist[j][k] * error_term
+                grad[k][1] += (loc[k][1] - loc[j][1]) / fake_dist[j][k] * error_term
+
+                # 记录总的误差值
+                total_error += abs(error_term)
+
+        print total_error
+        # 如果移动之后误差更大，那么退出循环
+        if last_error and last_error < total_error: break
+        last_error = total_error
+
+        # 移动节点
+        for k in range(n):
+            loc[k][0] += rate * grad[k][0]
+            loc[k][1] += rate * grad[k][1]
+
+    return loc
+
+def draw2d(data, labels, jpeg = "mds2d.jpg"):
+    img = Image.new("RGB", (2000, 2000), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    for i in range(len(data)):
+        x = (data[i][0] + 0.5) * 1000
+        y = (data[i][1] + 0.5) * 1000
+        draw.text((x, y), labels[i], (0, 0, 0))
+    img.save(jpeg, "JPEG")
+
+def test_scale_down():
+    rownames, colnames, data = readfile("zebo.txt")
+    clust = scale_down(data, distance = tanamoto)
+    draw2d(clust, rownames)
+
+test_scale_down()
